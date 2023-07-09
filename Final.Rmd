@@ -1,0 +1,274 @@
+---
+title: "Final"
+author: "Angel Fernandes"
+date: "2023-05-22"
+output:
+  word_document: default
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+Let me introduce you to the wonderful world of tennis! Tennis is a captivating sport that has captured the hearts of millions around the globe. It's a game of skill, strategy, and athleticism, played on a court with a net in the middle. Two players (or teams) use rackets to hit a ball back and forth, aiming to outsmart and outmaneuver their opponents. From the intense rallies to the electrifying atmosphere of major tournaments, tennis offers a thrilling and engaging experience for both players and spectators. So, whether you're a fan or aspiring player, get ready to dive into the excitement of this incredible sport!
+
+Why do I love tennis you ask? Two Words - Rafael Nadal. 
+He is undeniably one of the most remarkable players in the sport. Nadal's passion, intensity, and unmatched skills on the court have earned him a massive fan base worldwide. His fierce competitiveness and incredible athleticism make every match he plays a spectacle to behold. Whether it's his powerful forehand, relentless defense, or never-give-up attitude, Nadal's style of play has won the hearts of many tennis enthusiasts. It's no wonder that his exciting performances have inspired countless people to develop a love for the game.
+
+Why do I still love tennis? Two Words - Maria Sharapova. 
+Sharapova is a renowned tennis player who has left a significant impact on the sport. Known for her exceptional skills and fierce determination, she has garnered a large following of admirers around the world. Sharapova's powerful groundstrokes, aggressive style of play, and mental fortitude on the court have made her a formidable opponent for any challenger. Off the court, she has also made a mark as a role model and a successful entrepreneur. Sharapova's contributions to tennis have undoubtedly captured the attention and admiration of many fans.
+
+**Getting the Data**
+
+I acquired the data with the help of Github package I found, created by Stephanie Kovalchik (skoval), called 'deuce'. The package is a great resource for Analysis of Professional Tennis Data. I chose this data because it contains an exclusive collection of data sources and tools for extracting data for professional men's and women's tennis ranging from shot-level to match-level data.
+
+**Data Tables**
+
+Below is a list of the data I collected and what they contain:
+atp_elo - ATP Elo Ratings
+atp_odds - ATP Match Odds
+atp_rankings - Rankings of ATP Players
+atp_matches - ATP Playing Activity
+
+**Setup**
+I began by installing and loading the required github package and libraries. Following that, I loaded the datasets as directed by the Github author.
+```{r}
+#remotes::install_github("skoval/deuce")
+#install.packages("deuce")
+library(deuce)
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+```
+```{r}
+#For more info:
+help(package = "deuce")
+```
+
+**atp_elo - Winning Predictions**
+
+I loaded the dataset called atp_elo by filtering for matches played in the "Wimbledon" tournament, matches occurring on or after January 1, 2000, and involving specific players: "Rafael Nadal," "Roger Federer," "Andy Murray," "Jo-Wilfried Tsonga," and "Novak Djokovic." The resulting dataset is then arranged in ascending order first by player name and then by tournament start date. This code allows for the extraction of a subset of data relevant to Wimbledon matches involving specific players from a larger dataset.
+
+```{r}
+data(atp_elo)
+
+eloWim <- atp_elo %>%
+  filter(tourney_name == "Wimbledon") %>%
+  filter(tourney_start_date >= "2000-01-01") %>%
+  filter(player_name %in% c("Rafael Nadal","Roger Federer", "Andy Murray", "Jo-Wilfried Tsonga", "Novak Djokovic")) %>%
+  arrange(player_name, tourney_start_date )
+```
+
+The provided code fits a logistic regression model using the glm() function in R. The response variable is "win," and the predictors are the differences in "player_after_elo" and "player_before_elo," as well as the differences in "opponent_after_elo" and "opponent_before_elo." The model assumes a binomial family, indicating that the response variable follows a binomial distribution.
+
+```{r}
+# Fit the logistic regression model
+player_diff = eloWim$player_after_elo - eloWim$player_before_elo
+opp_diff = eloWim$opponent_after_elo - eloWim$opponent_before_elo
+model <- glm(win ~ player_diff + opp_diff, data = eloWim, family = binomial)
+summary(model)
+
+# Make predictions
+predictions <- predict(model, newdata = eloWim)
+summary(predictions)
+```
+In this analysis, a logistic regression model was applied to examine the relationship between various Elo ratings and the probability of winning a tennis match. The model used the formula win ~ (player_after_elo - player_before_elo) + (opponent_after_elo - opponent_before_elo) and assumed a binomial distribution for the response variable. The coefficients of the model indicate the estimated impact of Elo rating differences on the odds of winning. The intercept term suggests a baseline winning advantage, while the coefficients for the differences in player and opponent Elo ratings provide insights into their individual effects. Additionally, the summary provides descriptive statistics of the response variable, giving an overview of its distribution. 
+
+The predictors are the differences in "player_after_elo" and "player_before_elo" and the differences in "opponent_after_elo" and "opponent_before_elo."
+
+The coefficient estimates are as follows:
+
+The intercept is 1.84083.
+The coefficient for "player_diff" is -0.06992
+The coefficient for "opp_diff" is 0.02404.
+The significance of the coefficients is indicated by the p-values. The intercept is significant at the 0.05 level. Both "player_diff" and "opp_diff" are not statistically significant.
+
+Graph showing the actual predictions vs the GLM predictions with actual and predicted wins / losses:
+```{r}
+# Create a data frame with actual outcomes and predicted probabilities
+predictions_df <- data.frame(win = eloWim$win, predictions = eloWim$prediction, glm_predictions = predictions)
+
+# Create a scatter plot
+predictions_df %>%
+  ggplot() +
+  geom_point(aes(x = glm_predictions, y = win, color = "Predicted Wins / Losses")) +
+  geom_point(aes(x = predictions, y = win)) +
+  geom_smooth(aes(x = glm_predictions, y = win, method = "glm", color = "GLM Predictions")) +
+    geom_smooth(aes(x = predictions, y = win, method = "glm", color = "Actual Predictions")) +
+  labs(x = "Predicted Probability", y = "Actual Outcome") +
+  ggtitle("GLM Predictions vs. Actual Outcomes") +
+  scale_y_continuous(limits = c(0, 1))
+```
+
+**atp_odds - Players vs. Courts**
+
+I loaded the dataset called atp_odds by filtering for matches occurring on or after January 1, 2000, and involving specific players: "Rafael Nadal," "Roger Federer," "Andy Murray," "Jo-Wilfried Tsonga," and "Novak Djokovic." Then I created two datasets filtering for winning players and losers and counted the number of times they won / loss grouped by the court surface played on.
+
+Grouped Bar Chart showing number of games won or loss and Court Surface played on:
+```{r}
+data(atp_odds)
+
+atp_odds <- atp_odds %>%
+  filter(Date >= "2000-01-01") %>%
+  filter(Winner %in% c("Nadal R.","Federer R.", "Murray A.", "Tsonga J.W.", "Djokovic N.") | Loser %in% c("Nadal R.","Federer R.", "Murray A.", "Tsonga J.W.", "Djokovic N.")) %>%
+  select("ATP", "Location", "Tournament", "Date", "Series", "Court", "Surface", "Round", "Best.of",
+         "Winner", "Loser", "WRank", "LRank", "WPts", "LPts", "W1", "L1", "W2", "L2",
+         "W3", "L3", "W4", "L4", "W5", "L5", "Wsets", "Lsets", "Comment",
+         "B365W", "B365L", "PSW", "PSL", "MaxW", "MaxL", "AvgW", "AvgL")
+
+atp_odds1 <- atp_odds %>%
+  group_by(Surface, player_name = Winner) %>%
+  count() %>%
+  rename(count_player = n) %>%
+  filter(player_name %in% c("Nadal R.","Federer R.", "Murray A.", "Tsonga J.W.", "Djokovic N."))
+  
+atp_odds2 <- atp_odds %>%
+  group_by(Surface, player_name = Loser) %>%
+  count() %>%
+  rename(count_player = n) %>%
+  filter(player_name %in% c("Nadal R.","Federer R.", "Murray A.", "Tsonga J.W.", "Djokovic N."))
+
+merged_data <- rbind(transform(atp_odds1, dataset = "Winner"),
+                     transform(atp_odds2, dataset = "Loser"))
+
+# Plot the clustered stacked bar chart
+atp_odds1 %>%
+  ggplot()+
+  geom_bar(aes(x = player_name, y = count_player, fill = Surface), position="dodge", stat = "identity") +
+  labs(x = "Player Name", y = "Count", fill = "Surface") +
+  ggtitle("Player Wins vs Court Surface") +
+  theme_minimal()
+
+atp_odds2 %>%
+  ggplot()+
+  geom_bar(aes(x = player_name, y = count_player, fill = Surface), position="dodge", stat = "identity") +
+  labs(x = "Player Name", y = "Count", fill = "Surface") +
+  ggtitle("Player Losses vs Court Surface") +
+  theme_minimal()
+```
+Observations:
+1. All players seem to perform very well and also lost the most games on the Hard Court. 
+2. Federer is the best on Hard Court and Grass Court but Nadal is the King of the Clay Court.
+3. Murray loses the most on Hard Court, followed by Federer and Nadal on the Grass Court and Federer on the Clay Court.
+4. Overall, Federer wins more games as compared to Tsonga and Djokovic wins more games as compared to Nadal.
+4. Overall, Tsongs loses more games as compared to Federer and Nadal loses more games as compared to Djokovic.
+
+**atp_rankings - Seed over the Years**
+
+I loaded the dataset called atp_rankings by filtering for rankings occurring on or after January 1, 2000, and involving specific players: "Rafael Nadal," "Roger Federer," "Andy Murray," "Jo-Wilfried Tsonga," and "Novak Djokovic", found by their player_id numbers.
+
+Line Graph showing ranking over the years:
+```{r}
+data(atp_rankings)
+
+rankings <- atp_rankings %>%
+  filter(player_id %in% c(104745, 103819, 104918, 104542, 104925)) %>%
+  arrange(player_id) %>%
+  mutate(
+    year = as.integer(substr(date, 1, 4)),
+    ranking_int = as.integer(ranking),
+    ranking_points_int = as.integer(ranking_points),
+    player = case_when(
+      player_id == 104745 ~ "Rafael Nadal",
+      player_id == 103819 ~ "Roger Federer",
+      player_id == 104918 ~ "Andy Murray",
+      player_id == 104542 ~ "Jo-Wilfried Tsonga",
+      player_id == 104925 ~ "Novak Djokovic",
+      TRUE ~ "Unknown"
+    )
+  ) %>%
+  select(player, year, ranking_int, ranking_points_int) %>%
+  group_by(player, year) %>%
+  summarise(
+    avg_ranking = as.integer(round(mean(ranking_int))),
+    avg_ranking_points = as.integer(round(mean(ranking_points_int)))
+  )
+
+rankings %>%
+  ggplot() +
+  geom_line(aes(x = year, y = avg_ranking, color = player)) +
+  geom_point(aes(x = year, y = avg_ranking, color = player)) +
+  xlab("Year") +
+  ylab("Ranking") +
+  ggtitle("Ranking over the years") +
+  scale_y_reverse()
+
+```
+Observations:
+1. Jo-Wilfried Tsonga has the shortest history of ranking 1 with some minor downs along the way.
+2. Rodger Federer would have had the longest first seed if he didnt retire in 2022
+3. Rafael has held the first seed for 23 years now.
+4. Tsonga's reign lasted about 8 years.
+
+**atp_matches - Wins / Loses vs Time**
+
+I loaded the dataset called atp_matches by filtering for matches played in the "Wimbledon" tournament and involving specific players: "Rafael Nadal," "Roger Federer," "Andy Murray," "Jo-Wilfried Tsonga," and "Novak Djokovic." Then I created two datasets filtering for winning players and losers and calculated the Average time taken to either win or lose the game.
+
+Grouped Bar Chart showing the Average time taken to either win or lose the game:
+```{r}
+data(atp_matches)
+
+MatchesNadal <- atp_matches %>%
+  tibble()%>%
+  filter(tourney_name == "Wimbledon") %>%
+  filter(winner_name == "Rafael Nadal" | loser_name == "Rafael Nadal") 
+
+MatchesFederer <- atp_matches %>%
+  filter(tourney_name == "Wimbledon") %>%
+  filter(winner_name == "Roger Federer" | loser_name == "Roger Federer") 
+
+MatchesMurray <- atp_matches %>%
+  filter(tourney_name == "Wimbledon") %>%
+  filter(winner_name == "Andy Murray" | loser_name == "Andy Murray") 
+
+MatchesTsonga <- atp_matches %>%
+  filter(tourney_name == "Wimbledon") %>%
+  filter(winner_name == "Jo-Wilfried Tsonga" | loser_name == "Jo-Wilfried Tsonga") 
+
+MatchesDjokovic <- atp_matches %>%
+  filter(tourney_name == "Wimbledon") %>%
+  filter(winner_name == "Novak Djokovic" | loser_name == "Novak Djokovic") 
+```
+```{r}
+merged_matches <- bind_rows(MatchesNadal, MatchesFederer, MatchesMurray, MatchesTsonga, MatchesDjokovic)
+
+merged_matches1 <- merged_matches %>%
+  mutate(minutes = ifelse(is.na(minutes), 0, minutes)) %>%
+  group_by(player_name = winner_name) %>%
+  summarize(average_minutes = mean(minutes)) %>%
+  filter(player_name %in% c("Rafael Nadal", "Roger Federer", "Andy Murray", "Jo-Wilfried Tsonga", "Novak Djokovic"))
+
+merged_matches2 <- merged_matches %>%
+  mutate(minutes = ifelse(is.na(minutes), 0, minutes)) %>%
+  group_by(player_name = loser_name) %>%
+  summarize(average_minutes = mean(minutes)) %>%
+  filter(player_name %in% c("Rafael Nadal", "Roger Federer", "Andy Murray", "Jo-Wilfried Tsonga", "Novak Djokovic"))
+
+merged_data <- rbind(transform(merged_matches1, dataset = "Winner"),
+                     transform(merged_matches2, dataset = "Loser"))
+
+# Plot the clustered stacked bar chart
+merged_data %>%
+  ggplot()+
+  geom_bar(aes(x = player_name, y = average_minutes, fill = dataset), position="dodge", stat = "identity") +
+  labs(x = "Player Name", y = "Average Minutes", fill = "dataset") +
+  ggtitle("Average time taken to Win. /Lose Games")+
+  scale_fill_manual(values = c("Winner" = "blue", "Loser" = "red")) +
+  theme_minimal()
+```
+
+Observations:
+1. Tennis matches last anywhere between 2 to 3 hours.
+2. The longest tennis match lasted about 11 hours over a period of 3 days between John Isner and Nicolas Mahut in Wimbledon in 2010.
+3. Rodger Federer spends the most time trying to salvage his game and ultimately losing but spends less time playing when he does win it.
+4. Rafael Nadal spends the most time winning his game and a good chunk of time trying to salvage it.
+
+**Conclusion**
+
+The logistic regression model showed that the baseline winning advantage, represented by the intercept, is statistically significant. However, the differences in player and opponent Elo ratings (player_diff and opp_diff) were not found to be statistically significant in predicting the odds of winning.
+
+In terms of court performance, it was observed that players generally perform well on Hard Courts, while Federer excels on both Hard and Grass Courts, and Nadal dominates on Clay Courts.
+
+Looking at the rankings, Tsonga had a relatively short period as the top-ranked player, while Federer would have held the first seed for the longest duration if he hadn't retired in 2022. Rafael Nadal has maintained the first seed for 23 years.
+
+The duration of tennis matches typically ranges from 2 to 3 hours, but the longest recorded match lasted an astonishing 11 hours over three days. Federer tends to spend more time salvaging his game in losses but less time playing when he wins, while Nadal invests more time in winning matches and attempting comebacks.
